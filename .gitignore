@@ -7,3 +7,4 @@
 **/chrome-headless-shell-win64/
 **/chrome-headless-shell-linux64/
 .venv/
+.idea/
