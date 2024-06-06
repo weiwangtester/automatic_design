@@ -1,0 +1,9 @@
+# reports  # 为上库report
+**/allure_json_report/
+**/__pycache__/
+**/.pytest_cache/
+~$*
+**/chromedriver.exe
+**/chrome-headless-shell-win64/
+**/chrome-headless-shell-linux64/
+.venv/
