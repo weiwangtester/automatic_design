@@ -1,0 +1,66 @@
+- test_name: TestCase1        # 测试用例的名称
+  desc: 这是一个Demo测试用例    # 测试用例的描述
+
+  steps: # 测试步骤列表
+    - step_name: 指定用户登录       # 步骤1：使用指定的用户名和密码登录
+      action_name: login
+      action_id: 10  # action唯一id
+      params: # 传递给该action方法的参数
+        username: test_user
+        password: 123456789
+        user_id: 999
+        expect: True
+      expected_description: # 该步骤的预期结果描述
+        - "登录步骤, 预期登录成功"
+
+    - step_name: 查询用户信息       # 步骤2：查询个人信息
+      action_name: search_user_info
+      action_id: 15
+      params:
+        username: test_user
+        expect: True
+      expected_description:
+        - "当前登录用户信息查询成功"
+
+    - step_name: 查询用户信息       # 步骤3：查询admin用户信息
+      action_name: search_user_info
+      action_id: 15
+      params:
+        username: admin
+        expect: False
+      expected_description:
+        - "admin管理员信息查询失败"
+
+    - step_name: 步骤样例       # 步骤4：样例步骤
+      action_name: foo4
+      action_id: 19
+      params:
+        foo_params4: foo_params4
+        expect: False
+      expected_description:
+        - "admin管理员信息查询失败"
+
+  setup: # （可选）测试前的设置或初始化操作
+    - step_name: 初始化测试数据
+      action_name: initialize_data
+      action_id: 1  # action唯一id
+      params:
+        param1: 1
+        param2: 2
+        param3: 3
+        paramN: N
+      expected_description: # 该步骤的预期结果描述
+        - "Setup步骤, 预期初始化数据成功"
+
+  teardown: # （可选）测试后的清理操作
+    - step_name: 初始化测试环境
+      action_name: initialize_env
+      action_id: 3  # action唯一id
+      params:
+        param1: 1
+        param2: 2
+        param3: 3
+        paramN: N
+        expect: True
+      expected_description: # 该步骤的预期结果描述
+        - "Teardown步骤, 预期初始化测试数据成功"
