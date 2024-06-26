@@ -10,6 +10,8 @@
 import os
 import sys
 import shutil
+import pytest
+import allure
 from datetime import datetime
 from loguru import logger
 
@@ -71,7 +73,7 @@ logger.configure(
             "level": "DEBUG",  # 输出 DEBUG 级别及以上的日志
             "format": "{time:HH:mm:ss.SSS}  [{level}]  {message}",  # 日志格式
             "enqueue": True,  # 异步写入
-            "colorize": True,  # 彩色输出
+            "colorize": False,  # 彩色输出
         },
         {  # 第二个 handler：输出到文件
             "sink": os.path.join(ReportDir, "runcase.log"),  # 输出到当次测试报告文件夹下的文件 "runcase.log"
@@ -89,10 +91,78 @@ logger.configure(
 
 
 # --------------- end：结束设置全局logger --------------- #
+@pytest.hookimpl(tryfirst=True, hookwrapper=True)
 def pytest_sessionfinish(session, exitstatus):
+    yield
     # 通过当前的 allure json 测试报告目录，生成 allure html 测试报告
     os.system(f"allure generate {TmpAllureReportDir} -o {AllureReportDir} --clean")
     # 将 allure json 测试报告目录复制到 当前 allure_report 测试报告目录下
     shutil.copytree(TmpAllureReportDir, os.path.join(AllureReportDir, "json_report"))
     # 删除 allure json 测试报告临时目录
     shutil.rmtree(TmpAllureReportDir)
+
+
+# ------------------------------------------------------------------
+# 动态为每个测试用例添加独立的Handler
+def setup_test_logger(test_name):
+    log_file = os.path.join(TmpAllureReportDir, f"{test_name}.log")
+    handler_id = logger.add(log_file, level="DEBUG", format="{time:HH:mm:ss.SSS}  [{level}]  {message}", enqueue=True)
+    return handler_id, log_file
+
+
+def remove_test_logger(log_file, handler_id):
+    try:
+        logger.remove(log_file)
+    except:
+        pass
+    try:
+        logger.remove(handler_id)
+    except:
+        pass
+
+
+@pytest.fixture(scope='function', autouse=True)
+def setup_function_logging(request):
+    test_name = request.node.name
+    handler_id, log_file = setup_test_logger(test_name)
+    request.node.log_file = log_file
+    request.node.log_handler_id = handler_id
+    yield
+    remove_test_logger(log_file, handler_id)
+
+
+@pytest.hookimpl(tryfirst=True, hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    outcome = yield
+    report = outcome.get_result()
+    setattr(item, 'rep_' + report.when, report)
+
+
+@pytest.hookimpl(trylast=True)
+def pytest_runtest_teardown(item):
+    log_file = item.log_file
+    test_name = item.nodeid.replace("::", "_")
+    # handler_id = item.log_handler_id
+    if os.path.exists(log_file):
+        with open(log_file, 'r', encoding='utf-8') as f:
+            file_content = f.read()
+        allure.attach(file_content, name=f"{test_name}.log", attachment_type=allure.attachment_type.TEXT)
+
+    # 检查测试是否失败以及是否存在driver
+    if hasattr(item.instance.user_actions, 'driver') and item.instance.user_actions.driver is not None and hasattr(
+            item, 'rep_call') and item.rep_call.failed:
+
+        test_name = test_name.split("/")[-1].replace(".py", "")
+
+        screenshot_path = os.path.join(TmpAllureReportDir, f"{test_name}.png")
+        item.instance.user_actions.driver.save_screenshot(screenshot_path)
+        with open(screenshot_path, 'rb') as f:
+            file_content = f.read()
+        allure.attach(file_content, name=f"{test_name}.png", attachment_type=allure.attachment_type.PNG)
+        # 清理driver
+        try:
+            item.instance.user_actions.driver.quit()
+        except Exception as e:
+            logger.info(e)
+        finally:
+            item.instance.user_actions.driver = None
